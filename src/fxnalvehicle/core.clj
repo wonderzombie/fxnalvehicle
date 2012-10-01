@@ -28,7 +28,7 @@
     (str noext "." to)))
 
 (defn hasexts? [f exts]
-  (some true?
+  (reduce #(or %1 %2)
     (map #(.endsWith f %1) exts)))
 
 (defn parse-date [date]
@@ -70,7 +70,7 @@
       mk-output-data
       mk-title-and-date))
 
-(defn gen-metadata' [files]
+(defn gen-metadata [files]
   (->> files
        (map mk-all)
        (filter ismarkdown?)))
