@@ -31,4 +31,10 @@
     "foo"       false
     "foomd"     false))
 
+(defn date-as-vec [d]
+  [(.getYear d) (.getMonthOfYear d) (.getDayOfMonth d)])
 
+(deftest test-parsedate
+  (are [d exp] (= exp (date-to-vec (parse-date' d)))
+    "2012-09-23" [2012 9 23]
+    "2012-12-28" [2012 12 28]))

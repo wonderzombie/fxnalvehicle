@@ -2,6 +2,8 @@
   (:require [clojure.string :as cstr]
             [clojure.java.io :as io]
             [clojure.java.shell :as shell]
+            [clj-time.core :as time]
+            [clj-time.format :as timef]
             [markdown :as md])
   (:import java.text.SimpleDateFormat))
 
@@ -34,6 +36,10 @@
 (defn parse-date [date]
   (.. (SimpleDateFormat. "yyyy-MM-dd")
       (parse date)))
+
+(defn parse-date' [date]
+  (let [fmt (timef/formatters :date)]
+    (timef/parse fmt date)))
 
 (defn ismarkdown? [f]
   (let [fname (if (map? f) (:filename f) f)]
@@ -80,24 +86,24 @@
 ;; IO related methods. Tread lightly.
 
 (defn doconvert [in out]
-  (let [ins  (io/input-stream in)
-        outs (io/output-stream out)]
+  (with-open [rdr  (io/reader in)
+              w    (io/writer out)]
     (do
       (println (format "Converting %s to %s" in out))
-      (md/md-to-html in out))))
+      (md/md-to-html rdr w))))
+
+(defn initializef [f]
+  (doto f
+    (.delete)
+    (.createNewFile)))
 
 (defn dogenblog [in out]
-  (for [f     (gen-metadata (list-files in))
-        outf  (:out f)
-        inf   (:file f)]
-    (do (println "Input file is: "  inf)
-        (println "Output file is: " outf)
-        (doto out
-          (.delete)
-          (.createNewFile))
-        (doconvert (:file f) (:out f)))))
+  (doseq [f (gen-metadata (list-files in))]
+    (let [inf (:file f) of (:out f)]
+      (initializef of)
+      (doconvert inf of))))
 
 (defn -main [& args]
-  (let [indir (first args)
+  (let [indir  (first args)
         outdir (second args)]
     (dogenblog indir outdir)))
