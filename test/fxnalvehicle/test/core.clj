@@ -2,9 +2,6 @@
   (:use [fxnalvehicle.core])
   (:use [clojure.test]))
 
-; (deftest replace-me ;; FIXME: write
-;   (is false "No tests have been written."))
-
 (deftest test-drop-ext
   (are [f exp] (= exp (drop-ext f))
     "foo.html"      "foo"
@@ -34,7 +31,13 @@
 (defn date-as-vec [d]
   [(.getYear d) (.getMonthOfYear d) (.getDayOfMonth d)])
 
-(deftest test-parsedate
-  (are [d exp] (= exp (date-to-vec (parse-date' d)))
+(deftest test-parse-date
+  (are [d exp] (= exp (date-as-vec (parse-date d)))
     "2012-09-23" [2012 9 23]
     "2012-12-28" [2012 12 28]))
+
+(deftest test-mk-title-and-date
+  (are [f exp] (= exp (:subject (mk-title-and-date {:filename f})))
+    "2012-09-09-foo-bar-baz.txt" "foo bar baz"
+    "2012-09-09-foo.txt"         "foo"
+    "2012-12-12-foo_bar_baz.txt" "foo_bar_baz"))

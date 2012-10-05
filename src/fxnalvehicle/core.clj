@@ -33,11 +33,11 @@
   (reduce #(or %1 %2)
     (map #(.endsWith f %1) exts)))
 
-(defn parse-date [date]
+(defn parse-date' [date]
   (.. (SimpleDateFormat. "yyyy-MM-dd")
       (parse date)))
 
-(defn parse-date' [date]
+(defn parse-date [date]
   (let [fmt (timef/formatters :date)]
     (timef/parse fmt date)))
 
