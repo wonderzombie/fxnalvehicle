@@ -19,6 +19,37 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(def LINES
+  "---
+subject: foo bar baz
+date: 2012-10-06
+tags: foo bar, baz, quux frotz
+
+Hello world.")
+
+(defn newline? [x]
+  (= x "\n"))
+
+(defn -header-taker [acc x]
+  (if (and (empty? (last acc)) (empty? x))
+    acc
+    (conj acc x)))
+
+
+(defn take-header [lines]
+  "Consumes the header from a sequence of lines."
+  {:pre [(not-empty? lines)]}
+  (loop [acc [] lines lines]
+    (if (and (empty? (last acc) (empty? (first lines))))
+      acc
+      (recur (conj acc (first lines) (next lines))))))
+
+(defn parse-header [h]
+  "Requires header to be a series of lines."
+  )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 ;; Text manipulation and/or parsing.
 
 (defn drop-ext [file]
@@ -58,8 +89,8 @@
     :filename (.getName f)
     :dir (.getParentFile f)))
 
-(defn mk-output-data [{fname :filename dir :dir :as data}]
-  (let [outn (change-ext "html" fname)
+(defn mk-output-data [{:keys [filename dir] :as data}]
+  (let [outn (change-ext "html" filename)
         outf (io/file dir outn)]
     (assoc data :out outf)))
 

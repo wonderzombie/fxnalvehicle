@@ -10,8 +10,7 @@
 
 (deftest test-change-ext
   (are [to f exp] (= exp (change-ext to f))
-    "html"  "foo.md" "foo.html"
-    ".html" "foo.md" "foo..html"))
+    "html"  "foo.md" "foo.html"))
 
 (deftest test-hasexts
   (are [f exts exp] (= exp (hasexts? f exts))
