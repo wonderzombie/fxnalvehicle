@@ -11,7 +11,7 @@
 
 ;; Constants
 
-(def MULTIMARKDOWN 
+(def MULTIMARKDOWN
   "/usr/local/bin/multimarkdown")
 
 (def MARKDOWN-EXTS
@@ -19,34 +19,33 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;; Header-related functions.
+
 (def LINES
-  "---
-subject: foo bar baz
+  "subject: foo bar baz
 date: 2012-10-06
 tags: foo bar, baz, quux frotz
+---
 
 Hello world.")
 
-(defn newline? [x]
-  (= x "\n"))
-
-(defn -header-taker [acc x]
-  (if (and (empty? (last acc)) (empty? x))
-    acc
-    (conj acc x)))
-
+(defn -header-end? [line]
+  (re-find #"---" line))
 
 (defn take-header [lines]
-  "Consumes the header from a sequence of lines."
-  {:pre [(not-empty? lines)]}
-  (loop [acc [] lines lines]
-    (if (and (empty? (last acc) (empty? (first lines))))
-      acc
-      (recur (conj acc (first lines) (next lines))))))
+  (take-while #(not (-header-end? %))
+    (cstr/split-lines lines)))
 
-(defn parse-header [h]
-  "Requires header to be a series of lines."
-  )
+(defn split-line [line]
+  (let [i (.indexOf line ":")
+        j (inc i)
+        k (subs line 0 i)
+        v (subs line j)]
+    [(keyword k) (cstr/trim v)]))
+
+(defn header-lines-as-map [lines]
+  (let [fields (mapcat split-line lines)]
+    (apply hash-map fields)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -64,9 +63,9 @@ Hello world.")
   (reduce #(or %1 %2)
     (map #(.endsWith f %1) exts)))
 
-(defn parse-date' [date]
-  (.. (SimpleDateFormat. "yyyy-MM-dd")
-      (parse date)))
+;; (defn parse-date' [date]
+;;   (.. (SimpleDateFormat. "yyyy-MM-dd")
+;;       (parse date)))
 
 (defn parse-date [date]
   (let [fmt (timef/formatters :date)]
