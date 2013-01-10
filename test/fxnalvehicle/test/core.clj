@@ -40,3 +40,8 @@
     "2012-09-09-foo-bar-baz.txt" "foo bar baz"
     "2012-09-09-foo.txt"         "foo"
     "2012-12-12-foo_bar_baz.txt" "foo_bar_baz"))
+
+(deftest test-split-line
+  (are [in exp] (= exp (split-line in))
+       "foo: bar"      [:foo "bar"]
+       "foo: bar: baz" [:foo "bar: baz"]))

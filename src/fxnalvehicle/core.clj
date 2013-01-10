@@ -9,13 +9,14 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;; Scratch.
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 ;; Constants
 
-(def MULTIMARKDOWN
-  "/usr/local/bin/multimarkdown")
-
 (def MARKDOWN-EXTS
-  [".md" ".txt"])
+  [".md" ".mkd" ".txt"])
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -29,31 +30,26 @@ tags: foo bar, baz, quux frotz
 
 Hello world.")
 
-(defn -header-end? [line]
+(defn- header-end? [line]
   (re-find #"---" line))
 
 (defn take-header [lines]
-  (take-while #(not (-header-end? %))
+  (take-while #(not (header-end? %))
     (cstr/split-lines lines)))
 
-(defn split-line [line]
-  (let [i (.indexOf line ":")
-        j (inc i)
-        k (subs line 0 i)
-        v (subs line j)]
-    [(keyword k) (cstr/trim v)]))
-
-(defn header-lines-as-map [lines]
-  (let [fields (mapcat split-line lines)]
-    (apply hash-map fields)))
+(defn header-to-map [lines]
+  (let [fields  (map #(cstr/split % #":" 2) lines)
+        keys (map (comp keyword first) fields)
+        vals (map (comp cstr/trim second) fields)]
+    (zipmap keys vals)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; Text manipulation and/or parsing.
 
-(defn drop-ext [file]
-  (subs file 0
-    (.lastIndexOf file ".")))
+(defn drop-ext [fname]
+  (subs fname 0
+    (.lastIndexOf fname ".")))
 
 (defn change-ext [to f]
   (let [noext (drop-ext f)]
@@ -63,53 +59,73 @@ Hello world.")
   (reduce #(or %1 %2)
     (map #(.endsWith f %1) exts)))
 
-;; (defn parse-date' [date]
-;;   (.. (SimpleDateFormat. "yyyy-MM-dd")
-;;       (parse date)))
-
 (defn parse-date [date]
   (let [fmt (timef/formatters :date)]
     (timef/parse fmt date)))
 
 (defn ismarkdown? [f]
-  (let [fname (if (map? f) (:filename f) f)]
+  (let [fname (.getName f)]
     (hasexts? fname MARKDOWN-EXTS)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; These files take and create file metadata.
+;; These functions take and create file metadata.
 
-(defn list-files [dir]
-  (filter #(.isFile %) ;; filter out dirs
-    (file-seq (io/file dir))))
+(defn list-files
+  ([dir pred]
+     (let [files (file-seq (io/file dir))]
+        (filter (fn [f]
+                  (and (.isFile f) (pred f)))
+                files)))
+  ([dir]
+     (list-files dir identity)))
 
-(defn mk-basic-data [{f :file :as data}]
-  (assoc data
-    :filename (.getName f)
-    :dir (.getParentFile f)))
 
-(defn mk-output-data [{:keys [filename dir] :as data}]
-  (let [outn (change-ext "html" filename)
-        outf (io/file dir outn)]
-    (assoc data :out outf)))
+(def name-bits
+  (letfn [(name-split [f]
+            (cstr/split f #"-"))]
+    (memoize name-split)))
 
-(defn mk-title-and-date [{fname :filename :as data}]
-  (let [noext (drop-ext fname)
-        t     (cstr/split noext #"-")
-        date  (parse-date (cstr/join "-" (take 3 t)))
-        subj  (cstr/join " " (drop 3 t))]
-    (assoc data :date date :subject subj)))
+(defn date-part [fname]
+  (-> fname
+      (name-bits)
+      (->> (take 3)
+           (cstr/join "-"))
+      (parse-date)))
 
-(defn mk-all [file]
-  (-> {:file file} ;; wrap in basic context.
-      mk-basic-data
-      mk-output-data
-      mk-title-and-date))
+(defn title-part [fname]
+  (-> fname
+      (drop-ext)
+      (name-bits)
+      (->> (drop 3)
+           (cstr/join " "))))
 
-(defn gen-metadata [files]
-  (->> files
-       (map mk-all)
-       (filter ismarkdown?)))
+(defn date-dir [fname]
+  (-> fname
+      (name-bits)
+      (->> (take 3)
+           (cstr/join "/"))))
+
+(defn drop-date [srcf]
+  (-> srcf
+      (name-bits)
+      (->> (drop 3)
+           (cstr/join "-"))))
+
+(defn output-dir [srcf]
+  (let [date-dir (date-dir srcf)
+        outn     (change-ext "html" (drop-date srcf))]
+    (io/file date-dir outn)))
+
+(defn make-post-data [file]
+  (let [srcf  (.getName file)]
+    (hash-map 
+      :file    file
+      :date    (date-part srcf)
+      :outfile (output-dir srcf)
+      :srcfile srcf
+      :title   (title-part srcf))))
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -125,13 +141,32 @@ Hello world.")
 (defn initializef [f]
   (doto f
     (.delete)
+    (.mkdirs)
     (.createNewFile)))
 
-(defn dogenblog [in out]
-  (doseq [f (gen-metadata (list-files in))]
-    (let [inf (:file f) of (:out f)]
-      (initializef of)
-      (doconvert inf of))))
+(defn list-sources [in]
+  (let [files (list-files in ismarkdown?)]
+    (map make-post-data files)))
+
+(defn dogenblog [sources]
+  (doseq [s sources]
+    (let [in  (s :file)
+          out (s :outfile)]
+      (initializef out)
+      (doconvert in out))))
+
+;; (defn dogenblog [in out]
+;;   (doseq [f (filter #(ismarkdown? (:srcfile %))
+;;               (map make-post-data (list-files in))]
+;;     (let [inf  (:file f)
+;;           outf (io/file out (:outfile f))]
+;;       (initializef outf)
+;;       (doconvert inf outf))))
+
+(defn in-out-pair [in outdir]
+  (let [inf  (:file in)
+        outf (io/file outdir (:outfile in))]
+    [inf outf]))
 
 (defn -main [& args]
   (let [indir  (first args)
